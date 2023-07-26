@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
+import fs from 'fs';
 
 const app = express();
 const port = 8080;
@@ -32,40 +33,71 @@ app.post('/images', upload.single('file'), (req, res, next) => {
   console.log('업로드된 파일의 전체 경로 ', path);
   console.log('파일의 바이트(byte 사이즈)', size);
 
-  // TODO: 모델 돌리는 서버 만들어서 관광지 이름 가져오기, 지금은 모델이 '해운대'라고 추론한 것으로 가정
+  // TODO: 모델 돌리는 서버 만들어서 관광지 이름 가져오기, 지금은 모델이 '해운대해수욕장'이라고 추론한 것으로 가정
+  const attractionName = '해운대해수욕장';
 
-  const attractionName = '해운대';
-
-  // TODO: attractionName 근처에 있는 음식점들 json으로 가져오기
   // 메모: busan_attraction.json에서 "cat1": "A05" 혹은 "contenttypeid": "39" 는 음식점을 의미
+  const attractions = JSON.parse(fs.readFileSync('../data-collection/busan_attractions.json')).item;
+  const found = attractions.filter((attraction) => attraction.title == attractionName)[0];
 
-  res.json({
-    attractionName,
-    restaurants: [
-      {
-        name: '미우 숯불갈비',
-        address: '부산 해운대구 구남로 22 2층',
-        phoneNumber: '0507-1389-8983',
-      },
-      {
-        name: '미우 숯불갈비',
-        address: '부산 해운대구 구남로 22 2층',
-        phoneNumber: '0507-1389-8983',
-      },
-      {
-        name: '미우 숯불갈비',
-        address: '부산 해운대구 구남로 22 2층',
-        phoneNumber: '0507-1389-8983',
-      },
-    ],
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const deg2rad = (deg) => {
+      return deg * (Math.PI / 180);
+    };
+
+    const R = 6371; // Radius of the earth in km
+    const dLat = deg2rad(lat2 - lat1); // deg2rad below
+    const dLon = deg2rad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const d = R * c; // Distance in km
+    return d;
+  };
+
+  const filtered = attractions.filter((attraction) => {
+    // 음식점이 아닌 경우 고려대상에서 제외
+    if (attraction.cat1 != 'A05') {
+      return false;
+    }
+    const distance = calculateDistance(found.mapy, found.mapx, attraction.mapy, attraction.mapx);
+
+    // 거리가 2km 초과인 경우 제외
+    if (distance > 2.0) {
+      return false;
+    }
+    return true;
   });
+
+  res.json(filtered);
+
+  // res.json({
+  //   attractionName,
+  //   restaurants: [
+  //     {
+  //       name: '미우 숯불갈비',
+  //       address: '부산 해운대구 구남로 22 2층',
+  //       phoneNumber: '0507-1389-8983',
+  //     },
+  //     {
+  //       name: '미우 숯불갈비',
+  //       address: '부산 해운대구 구남로 22 2층',
+  //       phoneNumber: '0507-1389-8983',
+  //     },
+  //     {
+  //       name: '미우 숯불갈비',
+  //       address: '부산 해운대구 구남로 22 2층',
+  //       phoneNumber: '0507-1389-8983',
+  //     },
+  //   ],
+  // });
 });
 
 app.get('/', (req, res) => {
   res.send('Hello, World!');
 });
 
-// 서버 시작
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
