@@ -70,28 +70,10 @@ app.post('/images', upload.single('file'), (req, res, next) => {
     return true;
   });
 
-  res.json(filtered);
-
-  // res.json({
-  //   attractionName,
-  //   restaurants: [
-  //     {
-  //       name: '미우 숯불갈비',
-  //       address: '부산 해운대구 구남로 22 2층',
-  //       phoneNumber: '0507-1389-8983',
-  //     },
-  //     {
-  //       name: '미우 숯불갈비',
-  //       address: '부산 해운대구 구남로 22 2층',
-  //       phoneNumber: '0507-1389-8983',
-  //     },
-  //     {
-  //       name: '미우 숯불갈비',
-  //       address: '부산 해운대구 구남로 22 2층',
-  //       phoneNumber: '0507-1389-8983',
-  //     },
-  //   ],
-  // });
+  res.json({
+    attractionName,
+    restaurants: filtered,
+  });
 });
 
 app.get('/', (req, res) => {
