@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import fs from 'fs';
+import FormData from 'form-data';
+import axios from 'axios';
 
 const app = express();
 const port = 8080;
@@ -19,7 +21,7 @@ const upload = multer({ storage: storage });
 
 app.use(cors());
 
-app.post('/images', upload.single('file'), (req, res, next) => {
+app.post('/images', upload.single('file'), async (req, res, next) => {
   const { fieldname, originalname, encoding, mimetype, destination, filename, path, size } = req.file;
   const { name } = req.body;
 
@@ -33,11 +35,26 @@ app.post('/images', upload.single('file'), (req, res, next) => {
   console.log('업로드된 파일의 전체 경로 ', path);
   console.log('파일의 바이트(byte 사이즈)', size);
 
-  // TODO: 모델 돌리는 서버 만들어서 관광지 이름 가져오기, 지금은 모델이 '해운대해수욕장'이라고 추론한 것으로 가정
-  const attractionName = '해운대해수욕장';
+  // buffer를 FormData로 감쌈
+  const formData = new FormData();
+  formData.append('image', fs.createReadStream(`./uploads/${filename}`));
+
+  // 다른 서버로 전송
+  const result = await axios.post('http://localhost:5000/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+      // ...formData.getHeaders(),
+      // 'Content-Length': formData.getLengthSync(),
+    },
+  });
+
+  console.log(result.data);
+
+  // 모델 돌리는 서버 만들어서 관광지 이름 가져오기
+  const attractionName = result.data;
 
   // 메모: busan_attraction.json에서 "cat1": "A05" 혹은 "contenttypeid": "39" 는 음식점을 의미
-  const attractions = JSON.parse(fs.readFileSync('../data-collection/busan_attractions.json')).item;
+  const attractions = JSON.parse(fs.readFileSync('../data-collection/data_crawl.json')).item;
   const found = attractions.filter((attraction) => attraction.title == attractionName)[0];
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -56,19 +73,19 @@ app.post('/images', upload.single('file'), (req, res, next) => {
     return d;
   };
 
-  const filtered = attractions.filter((attraction) => {
-    // 음식점이 아닌 경우 고려대상에서 제외
-    if (attraction.cat1 != 'A05') {
-      return false;
-    }
-    const distance = calculateDistance(found.mapy, found.mapx, attraction.mapy, attraction.mapx);
+  const filtered = attractions
+    .filter((attraction) => attraction.cat1 == 'A05')
+    .map((attraction) => {
+      // 음식점이 아닌 경우 고려대상에서 제외
+      const distance = calculateDistance(found.mapy, found.mapx, attraction.mapy, attraction.mapx);
 
-    // 거리가 2km 초과인 경우 제외
-    if (distance > 2.0) {
-      return false;
-    }
-    return true;
-  });
+      attraction.distance = distance;
+
+      return attraction;
+    })
+    .filter((attraction) => (attraction.distance > 1.0 ? false : true));
+
+  filtered.sort((a, b) => a.distance - b.distance);
 
   res.json({
     attractionName,
