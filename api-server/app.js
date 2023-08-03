@@ -4,6 +4,8 @@ import multer from 'multer';
 import fs from 'fs';
 import FormData from 'form-data';
 import axios from 'axios';
+import morgan from 'morgan';
+import helmet from 'helmet';
 
 const app = express();
 const port = 8080;
@@ -20,6 +22,41 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 app.use(cors());
+app.use(morgan('tiny'));
+app.use(helmet());
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+app.post('/questions', (req, res) => {
+  const { restaurantName, type } = req.body;
+
+  const restaurant = JSON.parse(fs.readFileSync('../data-collection/data_crawl.json')).item.filter((x) => x.title == restaurantName)[0];
+
+  let result;
+
+  switch (type) {
+    case '주소':
+      result = restaurant.addr1;
+      break;
+    case '전화번호':
+      result = restaurant.phone;
+      break;
+    case '영업시간':
+      result = restaurant.time;
+      break;
+    case '기타':
+      result = restaurant.info;
+      break;
+    case '가격':
+      result = restaurant.price;
+      break;
+    default:
+      result = '올바르지 않은 요청입니다.';
+      break;
+  }
+
+  res.json(result);
+});
 
 app.post('/images', upload.single('file'), async (req, res, next) => {
   const { fieldname, originalname, encoding, mimetype, destination, filename, path, size } = req.file;
@@ -66,8 +103,7 @@ app.post('/images', upload.single('file'), async (req, res, next) => {
     const dLat = deg2rad(lat2 - lat1); // deg2rad below
     const dLon = deg2rad(lon2 - lon1);
     const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const d = R * c; // Distance in km
     return d;
